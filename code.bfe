@@ -1,0 +1,102 @@
+%{
+/* vim: filetype=c
+ */
+#define CODE
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+#include "tree.h"
+#include "codegen.h"
+%}
+
+%start stat
+%term OP_NOT = 1
+%term OP_ADD = 2
+%term OP_MULT = 3
+%term OP_AND = 4
+%term OP_SM_EQ = 5
+%term OP_NEQ = 6
+%term OP_NUM = 7
+%term OP_ID = 8
+%term OP_EXP = 9
+%term OP_PT = 10
+%term OP_RET = 11
+%term OP_EMPTY = 12
+%term OP_SUB = 13
+%term OP_POINTER = 14
+%term OP_ASS = 15
+%term OP_IF = 16
+%term OP_ELSE_IF = 17
+%term OP_LOOP = 18
+%term OP_BREAK = 19
+%term OP_CONT = 20
+
+%%
+
+stat:	ret				# 0 #
+stat:	assign				# 0 #
+stat:   if_stat				# 0 #
+stat:   if_else_stat			# 0 #
+stat:	loop				# 0 #
+stat:   break_loop			# 0 #
+stat:   cont_loop			# 0 #
+
+ret:	OP_RET(expr)			# 1 # ret_var(bnode->left_child);
+ret:	OP_RET(t_expr)			# 1 # ret();
+
+t_expr:	term				# 1 # move_num(bnode->value, "rax");
+expr:	OP_ID				# 1 # 
+
+expr:	OP_ADD(expr,term)		# 1 # move_var(bnode->left_child, bnode->right_child);add_term_var(bnode->right_child->value, bnode->right_child);bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+expr:	OP_ADD(term,expr)		# 1 # move_var(bnode->right_child, bnode->left_child);add_term_var(bnode->left_child->value, bnode->left_child); bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+expr:	OP_ADD(expr,expr)		# 1 # add_expr_var(bnode->right_child,bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+
+expr:	OP_MULT(expr,term)		# 1 # move_var(bnode->left_child, bnode->right_child);mult_term_var(bnode->right_child->value, bnode->right_child); bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;	
+expr:	OP_MULT(term,expr)		# 1 # move_var(bnode->right_child, bnode->left_child);mult_term_var(bnode->left_child->value, bnode->left_child); bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+expr:	OP_MULT(expr,expr)		# 1 # mult_expr_var(bnode->right_child, bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+
+expr:	OP_AND(expr,term)		# 1 # move_var(bnode->left_child, bnode->right_child);and_term_var(bnode->right_child->value, bnode->right_child); bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;	
+expr:	OP_AND(term,expr)		# 1 # move_var(bnode->right_child, bnode->left_child);and_term_var(bnode->left_child->value, bnode->left_child); bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+expr:	OP_AND(expr,expr)		# 1 # and_expr_var(bnode->right_child, bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+
+expr: OP_NEQ(expr, term)		# 1 # notequal_term_var(bnode->right_child->value, bnode->left_child, bnode->right_child);bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+expr: OP_NEQ(term, expr)		# 1 # notequal_term_var(bnode->left_child->value, bnode->right_child, bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+expr: OP_NEQ(expr, expr)		# 1 # notequal_expr_var(bnode->left_child, bnode->right_child, bnode);
+
+expr: OP_SM_EQ(expr, term)		# 1 # sm_eq_term_var(bnode->right_child->value, bnode->left_child, bnode->right_child);bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+expr: OP_SM_EQ(term, expr)		# 1 # sm_eq_term_var(bnode->left_child->value, bnode->right_child, bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+expr: OP_SM_EQ(expr, expr)		# 1 # sm_eq_expr_var(bnode->left_child, bnode->right_child, bnode);
+
+expr: OP_NOT(expr)			# 1 # not_expr_var(bnode->left_child, bnode);
+expr: OP_NOT(term)			# 1 # not_term_var(bnode->left_child->value, bnode->left_child);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+
+expr: OP_SUB(expr)			# 1 # neg_expr_var(bnode->left_child, bnode);
+
+expr: OP_POINTER(expr)			# 1 # pointer_expr(bnode->left_child->reg);bnode->reg=bnode->left_child->reg;
+expr: OP_POINTER(term)			# 1 # pointer_term(bnode->left_child->value, bnode->left_child->reg);bnode->reg=bnode->left_child->reg;
+
+expr: OP_EMPTY(expr)			# 1 # move_var(bnode->left_child, bnode);
+expr: OP_EMPTY(term)			# 1 # move_num_var(bnode->left_child->value, bnode);
+
+term:	OP_NUM				# 0 #
+term:	OP_ADD(term,term)		# 0 # bnode->value = bnode->left_child->value + bnode->right_child->value;bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+term:	OP_MULT(term,term)		# 0 # bnode->value = bnode->left_child->value * bnode->right_child->value;bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+term:	OP_AND(term,term)		# 0 # bnode->value = bnode->left_child->value & bnode->right_child->value;bnode->reg=bnode->right_child->reg;bnode->offset=bnode->right_child->offset;bnode->is_var=bnode->right_child->is_var;
+
+term: OP_SUB(term)			 # 0 # bnode->value = (bnode -> left_child -> value) * (-1);bnode->reg=bnode->left_child->reg;bnode->offset=bnode->left_child->offset;bnode->is_var=bnode->left_child->is_var;
+
+term:	OP_NEQ(term,term)		 # 0 # bnode->value = (bnode->left_child->value != bnode->right_child->value)? -1 : 0;
+term:	OP_SM_EQ(term,term)		 # 0 # bnode->value = (bnode->left_child->value <= bnode->right_child->value)? -1 : 0;
+
+assign:		OP_ASS(OP_ID, term)	 # 1 # move_num_var(bnode->right_child->value, bnode->left_child);
+assign:		OP_ASS(OP_ID, expr)	 # 1 # move_var(bnode->right_child, bnode->left_child);
+
+if_stat:	OP_IF(expr)		 # 1 # if_var(bnode);
+if_else_stat:	OP_ELSE_IF(expr)	 # 1 # if_else_var(bnode);
+loop:		OP_LOOP			 # 0 #
+break_loop:	OP_BREAK		 # 0 #
+cont_loop:	OP_CONT 		 # 0 #
+
+
+%%
